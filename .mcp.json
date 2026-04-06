@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ollama-local": {
+      "command": "node",
+      "args": ["/Users/jamisonhill/Ai/Playground/.claude/mcp/server.js"],
+      "disabled": false
+    }
+  }
+}
