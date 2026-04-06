@@ -1,0 +1,15 @@
+{
+  "name": "healthy-breakfast-website",
+  "version": "1.0.0",
+  "description": "Interactive Vue.js recipe website",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "test": "echo 'tests go here'"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "lodash": "^4.17.21"
+  }
+}
