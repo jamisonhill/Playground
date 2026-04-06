@@ -11,10 +11,10 @@ Project initialization and local development environment.
 
 - [x] Initialize Vue CLI with recommended config
 - [x] Set up Express.js backend
-- [ ] Configure localhost routing (Vue :3000 ↔ Express :5000) ← CURRENT TASK
-- [ ] Test both servers running together
+- [x] Configure localhost routing (Vue :3000 ↔ Express :5000) ← COMPLETED
+- [x] Test both servers running together ← CURRENT TASK (just verified)
 
-**Next:** Configure localhost routing
+**Next:** Phase 2 ready to begin
 
 ---
 
