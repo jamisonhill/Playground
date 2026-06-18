@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(pip install:*)",
+      "Bash(notebooklm skill:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Skill(gsd:update)",
+      "WebSearch",
+      "Bash(mkdir -p ~/.claude/skills/pause-work ~/.claude/skills/resume-work ~/.claude/skills/research-orchestrator ~/.claude/skills/planning-orchestrator)",
+      "Read(//Users/jamisonhill/Ai/.claude/**)",
+      "Read(//Users/jamisonhill/Ai/my-learning-project/.claude/agents/**)",
+      "Read(//Users/jamisonhill/Ai/MHIT/agents/**)",
+      "Bash(ollama list:*)",
+      "Bash(git -C ~/.claude add .)",
+      "Bash(git -C ~/.claude commit -m \"sync config $\\(date +%Y-%m-%d\\)\")",
+      "Bash(git -C ~/.claude pull --rebase)",
+      "Bash(git -C ~/.claude push)",
+      "Bash(osascript -e 'quit app \"Ollama\"')",
+      "Bash(pkill -f Ollama)",
+      "Read(//Applications/Ollama.app/Contents/Resources/**)",
+      "Read(//Users/jamisonhill/.claude/skills/**)",
+      "Bash(ls -d research-orchestrator planning-orchestrator pause-work resume-work)"
+    ]
+  }
+}
