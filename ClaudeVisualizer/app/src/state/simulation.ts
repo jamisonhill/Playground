@@ -144,7 +144,7 @@ export function takeSnapshot(now: number): ClusterSnapshot {
   if (now - sim.lastFeedEventMs >= 1400) { emitFeedEvent(now); sim.lastFeedEventMs = now; }
   if (now - sim.lastTelltaleMs >= 3000) { shuffleTelltales(); sim.lastTelltaleMs = now; }
 
-  const sessions: SessionSnapshot[] = simSessions.map((s) => ({
+  const sessions: SessionSnapshot[] = simSessions.map((s, index) => ({
     sessionId: s.sessionId,
     name: s.name,
     model: s.model,
@@ -153,6 +153,8 @@ export function takeSnapshot(now: number): ClusterSnapshot {
     contextPercent: s.contextPercent,
     activityPercent: s.activityPercent,
     currentTool: s.busy ? s.tool : null,
+    // Pretend each session started progressively earlier (30 min apart).
+    startedAtMs: sim.appStartMs - (index + 1) * 30 * 60_000,
   }));
 
   // Per-snapshot jitter makes the trace look like live telemetry rather than
@@ -170,6 +172,7 @@ export function takeSnapshot(now: number): ClusterSnapshot {
   return {
     generatedAtMs: now,
     host: "jamison-mbp",
+    rosterLive: false, // the store flips this when the real registry connects
     sessions,
     gauges: {
       outputTokensPerSec: sim.tachTarget,

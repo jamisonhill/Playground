@@ -22,28 +22,37 @@ function Lane({ session }: { session: SessionSnapshot }) {
         <div className="model">{session.model} · {session.cwd}</div>
       </div>
       <div className="doing">
-        {isBusy && session.currentTool ? (
+        {isBusy ? (
           <>
             <span className="spin" />
             <span className="txt">
-              <span className="tool">{session.currentTool.toolName}</span> · {session.currentTool.argSummary}
+              {session.currentTool ? (
+                <>
+                  <span className="tool">{session.currentTool.toolName}</span> · {session.currentTool.argSummary}
+                </>
+              ) : (
+                // Busy but no tool info yet (current-tool tracking lands in Phase 2).
+                "working…"
+              )}
             </span>
           </>
         ) : (
           <span className="txt">idle — awaiting prompt</span>
         )}
       </div>
+      {/* A 0 means "not measured yet" (context arrives in Phase 3, activity in
+          Phase 2) — show a dash rather than a misleading 0%. */}
       <div className="stats">
         <div className="chip">
           <div className="cl">Ctx</div>
-          <div className="cv" style={{ color: chipColor(session.contextPercent) }}>
-            {session.contextPercent}%
+          <div className="cv" style={{ color: session.contextPercent > 0 ? chipColor(session.contextPercent) : "var(--label-dim)" }}>
+            {session.contextPercent > 0 ? `${Math.round(session.contextPercent)}%` : "—"}
           </div>
         </div>
         <div className="chip">
           <div className="cl">Act</div>
-          <div className="cv" style={{ color: isBusy ? chipColor(session.activityPercent) : "var(--label-dim)" }}>
-            {isBusy ? `${session.activityPercent}%` : "—"}
+          <div className="cv" style={{ color: isBusy && session.activityPercent > 0 ? chipColor(session.activityPercent) : "var(--label-dim)" }}>
+            {isBusy && session.activityPercent > 0 ? `${Math.round(session.activityPercent)}%` : "—"}
           </div>
         </div>
       </div>

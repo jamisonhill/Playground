@@ -32,6 +32,15 @@ export interface SessionSnapshot {
   activityPercent: number;
   /** Null when the session is idle / between tools. */
   currentTool: ToolActivity | null;
+  /** Registry `startedAt` (epoch ms) — session start time for uptime display. */
+  startedAtMs: number;
+}
+
+/** What the Rust registry watcher pushes over the Channel (Tier A1, Phase 1). */
+export interface RegistrySnapshot {
+  generatedAtMs: number;
+  host: string;
+  sessions: SessionSnapshot[];
 }
 
 /** One row in the Diagnostic Feed (claude_code.tool_result). */
@@ -90,6 +99,8 @@ export interface Telltales {
 export interface ClusterSnapshot {
   generatedAtMs: number;
   host: string;
+  /** True once real registry data is flowing (Phase 1+); false = full simulation. */
+  rosterLive: boolean;
   sessions: SessionSnapshot[];
   gauges: AggregateGauges;
   trace: TraceSample;

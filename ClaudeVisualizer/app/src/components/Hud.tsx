@@ -10,6 +10,8 @@ interface HudProps {
   busySessionCount: number;
   totalSessionCount: number;
   telltales: Telltales;
+  /** True once the real session registry is streaming (Phase 1). */
+  rosterLive: boolean;
 }
 
 /** "HH:MM:SS" in local time, same format as the mockup's clock. */
@@ -17,7 +19,7 @@ function formatClock(): string {
   return new Date().toTimeString().slice(0, 8);
 }
 
-export function Hud({ host, busySessionCount, totalSessionCount, telltales }: HudProps) {
+export function Hud({ host, busySessionCount, totalSessionCount, telltales, rosterLive }: HudProps) {
   const [clock, setClock] = useState(formatClock);
 
   useEffect(() => {
@@ -53,7 +55,9 @@ export function Hud({ host, busySessionCount, totalSessionCount, telltales }: Hu
         <div className={`lamp${telltales.apiError ? " on-red" : ""}`} title="API error">▲</div>
         <div className={`lamp${telltales.rateLimited ? " on-amber" : ""}`} title="Rate limit">↯</div>
       </div>
-      <span className="badge">Phase 0 · Simulated Data</span>
+      <span className="badge">
+        {rosterLive ? "Live Roster · Sim Metrics" : "Simulated Data"}
+      </span>
     </header>
   );
 }

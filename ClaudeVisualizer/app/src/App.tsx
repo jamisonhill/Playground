@@ -20,6 +20,7 @@ function App() {
         busySessionCount={busySessionCount}
         totalSessionCount={snapshot.sessions.length}
         telltales={snapshot.telltales}
+        rosterLive={snapshot.rosterLive}
       />
       <GaugeCluster gauges={snapshot.gauges} />
       <SessionLanes sessions={snapshot.sessions} />
