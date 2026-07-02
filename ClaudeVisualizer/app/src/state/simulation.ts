@@ -173,6 +173,7 @@ export function takeSnapshot(now: number): ClusterSnapshot {
     generatedAtMs: now,
     host: "jamison-mbp",
     rosterLive: false, // the store flips this when the real registry connects
+    hooksInstalled: false,
     sessions,
     gauges: {
       outputTokensPerSec: sim.tachTarget,

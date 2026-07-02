@@ -89,6 +89,7 @@ function composeSnapshot(): ClusterSnapshot {
     host: liveTelemetry.host,
     sessions: liveTelemetry.sessions,
     rosterLive: true,
+    hooksInstalled: liveTelemetry.hooksInstalled,
     feedRows,
     trace: liveTelemetry.throughput,
     gauges: {
@@ -102,14 +103,8 @@ function composeSnapshot(): ClusterSnapshot {
       // Uptime is the visualizer's own runtime — a frontend concern.
       appStartMs: simulated.odometers.appStartMs,
     },
-    // No fake warning lamps once real data flows: permission/API-error/rate
-    // telltales stay dark until Tier B/C (Phase 4) provides real signals.
-    telltales: {
-      telemetryConnected: true,
-      permissionWaiting: false,
-      apiError: false,
-      rateLimited: false,
-    },
+    // Real lamps: OTLP connection/errors (Tier B), permission waits (Tier C).
+    telltales: liveTelemetry.telltales,
   };
 }
 

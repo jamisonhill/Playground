@@ -27,3 +27,7 @@ libc = "0.2"
 # Parses the ISO 8601 timestamps on transcript lines (rate windows need them);
 # local-offset gives us the machine's timezone for the odometers' midnight reset.
 time = { version = "0.3", features = ["parsing", "local-offset"] }
+opentelemetry-proto = { version = "0.32.0", features = ["gen-tonic", "metrics", "logs"] }
+tonic = "0.14"
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "net", "time"] }
+axum = "0.8"

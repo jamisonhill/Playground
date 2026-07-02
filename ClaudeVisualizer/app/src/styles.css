@@ -91,6 +91,7 @@ body::before {                      /* faint carbon weave */
 
 /* ---------- HUD ---------- */
 .hud {
+  position: relative; /* anchors the data-sources popover */
   display: flex; align-items: center; gap: clamp(8px,1.5vw,20px); flex-wrap: wrap;
   padding: 8px clamp(10px,1.5vw,18px);
   /* Extra left padding clears the macOS traffic-light buttons, which overlay
@@ -116,6 +117,40 @@ body::before {                      /* faint carbon weave */
 .lamp.on-green { color: var(--green); background: rgba(55,214,122,.10); box-shadow: 0 0 11px rgba(55,214,122,.4),  inset 0 0 7px rgba(55,214,122,.2); }
 .badge { font-family: var(--cond); font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--amber);
   border: 1px solid rgba(255,185,59,.35); background: rgba(255,185,59,.07); padding: 4px 8px; border-radius: 5px; }
+
+/* ---------- data-sources popover (gear in the telltale row) ---------- */
+.lamp.gear { cursor: pointer; font-size: 13px; padding: 0; }
+.popover-backdrop { position: fixed; inset: 0; z-index: 40; }
+.popover {
+  position: absolute; top: calc(100% + 8px); right: clamp(10px, 1.5vw, 18px); z-index: 50;
+  width: min(420px, 90vw); max-height: 70vh; overflow-y: auto;
+  background: linear-gradient(180deg, var(--bezel-hi), var(--bezel));
+  border: 1px solid var(--ridge); border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0,0,0,.6);
+  padding: 14px 16px; cursor: default;
+}
+.popover h3 { font-family: var(--cond); font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--label); margin: 0 0 10px; }
+.popover .tier { border-top: 1px solid var(--ridge); padding: 10px 0; }
+.popover .tier:last-child { padding-bottom: 2px; }
+.popover .tier-head { display: flex; align-items: center; gap: 8px; }
+.popover .tier-head b { font-family: var(--cond); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--read); font-weight: 600; }
+.popover .tier-status { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--label-dim); }
+.popover .tier-dot { width: 7px; height: 7px; border-radius: 50%; background: #33414f; flex: none; }
+.popover .tier-dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.popover p { font-size: 11px; color: var(--label); line-height: 1.5; margin: 6px 0; }
+.popover pre {
+  font-family: var(--mono); font-size: 10px; line-height: 1.6; color: var(--teal);
+  background: #0b1119; border: 1px solid var(--ridge); border-radius: 7px;
+  padding: 8px 10px; margin: 6px 0 2px; overflow-x: auto; user-select: text; cursor: text;
+}
+.popover .tier-btn {
+  font-family: var(--cond); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--teal); background: rgba(20,227,204,.08); border: 1px solid rgba(20,227,204,.35);
+  border-radius: 6px; padding: 6px 12px; cursor: pointer; margin-top: 4px;
+}
+.popover .tier-btn:hover { background: rgba(20,227,204,.16); }
+.popover .tier-btn:disabled { color: var(--label-dim); border-color: var(--ridge); background: transparent; cursor: default; }
+.popover .tier-error { color: var(--red); font-family: var(--mono); font-size: 10px; }
 
 /* ---------- gauges (2x2, proportional canvas) ---------- */
 .gauges { display: grid; gap: 2px; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; padding: 4px; height: 100%; }

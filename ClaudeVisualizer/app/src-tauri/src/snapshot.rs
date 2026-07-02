@@ -73,7 +73,21 @@ pub struct OdometerTotals {
     pub commits: u64,
 }
 
-/// Everything the backend knows, pushed ~10×/second (Tier A, Phases 1–3).
+/// Warning-lamp states for the HUD telltale row (Tiers B and C).
+#[derive(Clone, Copy, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Telltales {
+    /// OTLP exporter has sent data recently (Tier B live).
+    pub telemetry_connected: bool,
+    /// A session is waiting on a permission prompt (Tier C hooks).
+    pub permission_waiting: bool,
+    /// claude_code.api_error seen recently.
+    pub api_error: bool,
+    /// api_error with status 429 seen recently.
+    pub rate_limited: bool,
+}
+
+/// Everything the backend knows, pushed ~10×/second (all tiers).
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TelemetrySnapshot {
@@ -90,4 +104,7 @@ pub struct TelemetrySnapshot {
     /// Ring of the last ~40 feed events, oldest→newest (frontend dedupes by id).
     pub recent_events: Vec<FeedEvent>,
     pub odometers: OdometerTotals,
+    pub telltales: Telltales,
+    /// Our hook entries are present in ~/.claude/settings.json (Tier C on).
+    pub hooks_installed: bool,
 }

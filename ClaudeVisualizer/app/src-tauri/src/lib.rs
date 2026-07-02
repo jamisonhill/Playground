@@ -8,11 +8,14 @@
 
 mod aggregator;
 mod backfill;
+mod hooks;
 mod model_config;
+mod otlp;
 mod session_registry;
 mod snapshot;
 mod transcript;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -22,12 +25,15 @@ use tauri::State;
 
 use aggregator::Aggregator;
 use session_registry::SessionRecord;
-use snapshot::{OdometerTotals, TelemetrySnapshot, Throughput};
+use snapshot::{OdometerTotals, TelemetrySnapshot, Telltales, Throughput};
 use transcript::TranscriptTailer;
 
-/// Shared with the command handler so new frontends can subscribe.
+/// Shared with the command handlers.
 struct AppState {
     subscribers: Arc<Mutex<Vec<Channel<TelemetrySnapshot>>>>,
+    /// Cached "our hooks are in settings.json" flag — re-checked only when the
+    /// install/uninstall commands run, so the 10 Hz pusher never touches disk.
+    hooks_installed: Arc<AtomicBool>,
 }
 
 /// The frontend calls this once at startup, handing us a Channel to stream
@@ -40,6 +46,23 @@ fn subscribe_registry(state: State<AppState>, channel: Channel<TelemetrySnapshot
         .lock()
         .expect("subscriber list mutex poisoned") // only poisons if a holder panicked
         .push(channel);
+}
+
+/// Opt-in Tier C: add our hook entries to ~/.claude/settings.json (backs the
+/// original file up first). Returns the new installed state.
+#[tauri::command]
+fn install_hooks(state: State<AppState>) -> Result<bool, String> {
+    hooks::install(&session_registry::home_dir())?;
+    state.hooks_installed.store(true, Ordering::Relaxed);
+    Ok(true)
+}
+
+/// Reverse of install_hooks — removes exactly the entries we added.
+#[tauri::command]
+fn uninstall_hooks(state: State<AppState>) -> Result<bool, String> {
+    hooks::uninstall(&session_registry::home_dir())?;
+    state.hooks_installed.store(false, Ordering::Relaxed);
+    Ok(false)
 }
 
 fn now_epoch_ms() -> i64 {
@@ -129,12 +152,20 @@ fn spawn_transcript_tailer(
     });
 }
 
+/// Everything the pusher needs beyond the Tier A state.
+struct EnrichmentState {
+    otlp: Arc<Mutex<otlp::OtlpState>>,
+    hook: Arc<Mutex<hooks::HookState>>,
+    hooks_installed: Arc<AtomicBool>,
+}
+
 /// Thread 3: compose a TelemetrySnapshot from roster + aggregator state and
 /// push it to every subscriber at ~10 Hz.
 fn spawn_pusher(
     roster: Arc<Mutex<Vec<SessionRecord>>>,
     shared_aggregator: Arc<Mutex<Aggregator>>,
     subscribers: Arc<Mutex<Vec<Channel<TelemetrySnapshot>>>>,
+    enrichment: EnrichmentState,
 ) {
     let host = session_registry::hostname();
     std::thread::spawn(move || loop {
@@ -195,6 +226,23 @@ fn spawn_pusher(
                 })
                 .collect();
 
+            // Tier B/C enrichment: authoritative burn rate when the OTLP
+            // exporter is live, warning lamps from OTLP errors + hook events.
+            let (otlp_burn, telemetry_connected, api_error, rate_limited) = {
+                let otlp = enrichment.otlp.lock().expect("otlp state mutex poisoned");
+                (
+                    otlp.burn_rate_usd_per_hour(now_ms),
+                    otlp.is_connected(now_ms),
+                    otlp.api_error_active(now_ms),
+                    otlp.rate_limit_active(now_ms),
+                )
+            };
+            let permission_waiting = enrichment
+                .hook
+                .lock()
+                .expect("hook state mutex poisoned")
+                .any_permission_waiting(now_ms);
+
             let today = agg.today_totals();
             TelemetrySnapshot {
                 generated_at_ms: now_ms,
@@ -202,7 +250,9 @@ fn spawn_pusher(
                 sessions,
                 throughput,
                 cache_hit_percent,
-                cost_per_hour: agg.burn_rate_usd_per_hour(now_ms),
+                // SPEC §4: cost.usage is the only authoritative dollar source —
+                // prefer it whenever Tier B is exporting; else the estimate.
+                cost_per_hour: otlp_burn.unwrap_or_else(|| agg.burn_rate_usd_per_hour(now_ms)),
                 // SPEC: aggregate fuel = max across sessions (the fullest tank
                 // is the one about to run out).
                 context_percent: max_context_percent,
@@ -214,6 +264,13 @@ fn spawn_pusher(
                     lines_edited: today.lines_edited,
                     commits: today.commits,
                 },
+                telltales: Telltales {
+                    telemetry_connected,
+                    permission_waiting,
+                    api_error,
+                    rate_limited,
+                },
+                hooks_installed: enrichment.hooks_installed.load(Ordering::Relaxed),
             }
         };
 
@@ -241,10 +298,54 @@ pub fn run() {
     let roster: Arc<Mutex<Vec<SessionRecord>>> = Arc::new(Mutex::new(Vec::new()));
     let shared_aggregator = Arc::new(Mutex::new(Aggregator::new(utc_offset_ms, app_start_ms)));
     let subscribers: Arc<Mutex<Vec<Channel<TelemetrySnapshot>>>> = Arc::new(Mutex::new(Vec::new()));
+    let otlp_state = Arc::new(Mutex::new(otlp::OtlpState::default()));
+    let hook_state = Arc::new(Mutex::new(hooks::HookState::default()));
+    let hooks_installed = Arc::new(AtomicBool::new(hooks::is_installed(
+        &session_registry::home_dir(),
+    )));
 
     session_registry::spawn_watcher(roster.clone());
     spawn_transcript_tailer(roster.clone(), shared_aggregator.clone());
-    spawn_pusher(roster.clone(), shared_aggregator.clone(), subscribers.clone());
+    spawn_pusher(
+        roster.clone(),
+        shared_aggregator.clone(),
+        subscribers.clone(),
+        EnrichmentState {
+            otlp: otlp_state.clone(),
+            hook: hook_state.clone(),
+            hooks_installed: hooks_installed.clone(),
+        },
+    );
+
+    // Tier B + C servers share one small tokio runtime on its own thread.
+    {
+        let otlp_state = otlp_state.clone();
+        let hook_state = hook_state.clone();
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .enable_all()
+                .build();
+            let Ok(runtime) = runtime else {
+                // No async runtime = no optional tiers; Tier A keeps working.
+                eprintln!("[enrichment] tokio runtime failed to start; Tiers B/C disabled");
+                return;
+            };
+            runtime.block_on(async {
+                let otlp_addr: std::net::SocketAddr = "127.0.0.1:4317"
+                    .parse()
+                    .expect("hardcoded address is valid");
+                let otlp_server = async {
+                    // Port 4317 taken (a real collector is running) — fine,
+                    // the user's collector wins and Tier B stays off here.
+                    if let Err(error) = otlp::serve(otlp_state, otlp_addr).await {
+                        eprintln!("[otlp] cannot serve on :4317 ({error}) — Tier B disabled");
+                    }
+                };
+                tokio::join!(otlp_server, hooks::serve(hook_state));
+            });
+        });
+    }
 
     // One-shot backfill of today's totals (everything before app start; the
     // live tailer owns everything after). Runs off the hot path.
@@ -271,8 +372,15 @@ pub fn run() {
         // window-state persists size/position to disk on close and restores it
         // on launch, so the cluster reopens exactly where the user left it.
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .manage(AppState { subscribers })
-        .invoke_handler(tauri::generate_handler![subscribe_registry])
+        .manage(AppState {
+            subscribers,
+            hooks_installed,
+        })
+        .invoke_handler(tauri::generate_handler![
+            subscribe_registry,
+            install_hooks,
+            uninstall_hooks
+        ])
         .run(tauri::generate_context!())
         // If Tauri itself fails to start (corrupt config, no display server),
         // there is nothing sensible to recover to — crash with a clear message.

@@ -64,6 +64,10 @@ export interface TelemetrySnapshot {
     linesEdited: number;
     commits: number;
   };
+  /** Warning lamps computed by the backend (Tier B errors, Tier C permission). */
+  telltales: Telltales;
+  /** Our hook entries are present in ~/.claude/settings.json (Tier C on). */
+  hooksInstalled: boolean;
 }
 
 /** One row in the Diagnostic Feed (claude_code.tool_result). */
@@ -124,6 +128,8 @@ export interface ClusterSnapshot {
   host: string;
   /** True once real registry data is flowing (Phase 1+); false = full simulation. */
   rosterLive: boolean;
+  /** Tier C hooks installed in ~/.claude/settings.json. */
+  hooksInstalled: boolean;
   sessions: SessionSnapshot[];
   gauges: AggregateGauges;
   trace: TraceSample;
