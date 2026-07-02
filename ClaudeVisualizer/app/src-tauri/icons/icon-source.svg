@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- macOS Big Sur-style rounded square with margin -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#141C27"/>
+      <stop offset="1" stop-color="#070A0F"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8AFFEF"/>
+      <stop offset="1" stop-color="#14E3CC"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)" stroke="#1E2A38" stroke-width="8"/>
+
+  <!-- dial track: 280° sweep starting lower-left, like the cluster gauges -->
+  <g transform="translate(512,532)">
+    <circle r="252" fill="none" stroke="#0c141d" stroke-width="58" stroke-linecap="round"
+            stroke-dasharray="1232 351" transform="rotate(129.6)"/>
+    <!-- redline zone at the top end of the dial -->
+    <circle r="252" fill="none" stroke="#FF4D57" stroke-opacity="0.55" stroke-width="58" stroke-linecap="round"
+            stroke-dasharray="223 1360" transform="rotate(345)"/>
+    <!-- lit value arc -->
+    <circle r="252" fill="none" stroke="url(#arc)" stroke-width="58" stroke-linecap="round"
+            stroke-dasharray="880 703" transform="rotate(129.6)"/>
+    <!-- needle pointing into the upper-right of the dial -->
+    <line x1="-42" y1="24" x2="196" y2="-114" stroke="#EEF4F8" stroke-width="26" stroke-linecap="round"/>
+    <circle r="58" fill="#1A2431" stroke="#14E3CC" stroke-width="12"/>
+    <circle r="16" fill="#14E3CC"/>
+  </g>
+</svg>
