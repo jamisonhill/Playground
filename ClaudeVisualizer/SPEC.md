@@ -6,7 +6,9 @@ non-scrolling window styled like a car dashboard.
 
 - **Visual source of truth:** [`mockup.html`](./mockup.html) — the approved concept. The
   shipped app must reproduce its layout, palette, motion, and information design with real data.
-- **Status:** Design approved. Ready to build with Fable 5. See [`BUILD_PROMPT.md`](./BUILD_PROMPT.md).
+- **Status:** **Built.** All phases (§7, 0–5) complete as of 2026-07-02 — see [`app/`](./app/)
+  and [`.planning/PROGRESS.md`](./.planning/PROGRESS.md). Remaining: Developer ID signing for
+  distribution; menu-bar companion deferred (§8).
 - **Target platform:** macOS (Apple Silicon), Tauri 2 desktop app.
 
 ---
