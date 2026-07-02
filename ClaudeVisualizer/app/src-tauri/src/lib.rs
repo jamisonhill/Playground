@@ -7,6 +7,8 @@
 // TelemetrySnapshot ~10×/second and streams it to every subscribed frontend.
 
 mod aggregator;
+mod backfill;
+mod model_config;
 mod session_registry;
 mod snapshot;
 mod transcript;
@@ -20,7 +22,7 @@ use tauri::State;
 
 use aggregator::Aggregator;
 use session_registry::SessionRecord;
-use snapshot::{TelemetrySnapshot, Throughput};
+use snapshot::{OdometerTotals, TelemetrySnapshot, Throughput};
 use transcript::TranscriptTailer;
 
 /// Shared with the command handler so new frontends can subscribe.
@@ -104,10 +106,20 @@ fn spawn_transcript_tailer(
             }
 
             tailer.retain_sessions(&live_ids);
-            shared_aggregator
-                .lock()
-                .expect("aggregator mutex poisoned")
-                .prune(&live_ids, arrival_ms);
+            {
+                let mut agg = shared_aggregator.lock().expect("aggregator mutex poisoned");
+                agg.prune(&live_ids, arrival_ms);
+                // Seed each session's context gauge from the startup peek —
+                // a no-op once the live tailer has measured it.
+                for record in &records {
+                    if record.initial_context_tokens > 0 {
+                        agg.seed_context_tokens(
+                            &record.snapshot.session_id,
+                            record.initial_context_tokens,
+                        );
+                    }
+                }
+            }
 
             // Wake on a filesystem event or after 250ms, whichever is first…
             let _ = event_rx.recv_timeout(Duration::from_millis(250));
@@ -164,6 +176,7 @@ fn spawn_pusher(
                 0.0
             };
 
+            let mut max_context_percent = 0.0f64;
             let sessions = records
                 .iter()
                 .map(|record| {
@@ -176,17 +189,31 @@ fn spawn_pusher(
                     }
                     session.current_tool = agg.current_tool(id);
                     session.activity_percent = activity.get(id).copied().unwrap_or(0.0);
+                    session.context_percent = agg.context_percent(id).unwrap_or(0.0);
+                    max_context_percent = max_context_percent.max(session.context_percent);
                     session
                 })
                 .collect();
 
+            let today = agg.today_totals();
             TelemetrySnapshot {
                 generated_at_ms: now_ms,
                 host: host.clone(),
                 sessions,
                 throughput,
                 cache_hit_percent,
+                cost_per_hour: agg.burn_rate_usd_per_hour(now_ms),
+                // SPEC: aggregate fuel = max across sessions (the fullest tank
+                // is the one about to run out).
+                context_percent: max_context_percent,
                 recent_events: agg.feed_events(),
+                odometers: OdometerTotals {
+                    tokens_today: today.tokens,
+                    cost_today_usd: today.cost_usd,
+                    tool_calls: today.tool_calls,
+                    lines_edited: today.lines_edited,
+                    commits: today.commits,
+                },
             }
         };
 
@@ -202,13 +229,43 @@ fn spawn_pusher(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Local UTC offset must be read before any threads exist — the time crate
+    // refuses to read the environment's timezone from a multithreaded process
+    // (a Unix soundness rule). Falls back to UTC, which only shifts the
+    // odometers' midnight reset.
+    let utc_offset_ms = time::UtcOffset::current_local_offset()
+        .map(|offset| offset.whole_seconds() as i64 * 1000)
+        .unwrap_or(0);
+    let app_start_ms = now_epoch_ms();
+
     let roster: Arc<Mutex<Vec<SessionRecord>>> = Arc::new(Mutex::new(Vec::new()));
-    let shared_aggregator = Arc::new(Mutex::new(Aggregator::new()));
+    let shared_aggregator = Arc::new(Mutex::new(Aggregator::new(utc_offset_ms, app_start_ms)));
     let subscribers: Arc<Mutex<Vec<Channel<TelemetrySnapshot>>>> = Arc::new(Mutex::new(Vec::new()));
 
     session_registry::spawn_watcher(roster.clone());
     spawn_transcript_tailer(roster.clone(), shared_aggregator.clone());
-    spawn_pusher(roster, shared_aggregator, subscribers.clone());
+    spawn_pusher(roster.clone(), shared_aggregator.clone(), subscribers.clone());
+
+    // One-shot backfill of today's totals (everything before app start; the
+    // live tailer owns everything after). Runs off the hot path.
+    {
+        let shared_aggregator = shared_aggregator.clone();
+        std::thread::spawn(move || {
+            let home = session_registry::home_dir();
+            // Local midnight expressed in UTC epoch ms.
+            let day_start_ms =
+                (app_start_ms + utc_offset_ms).div_euclid(86_400_000) * 86_400_000 - utc_offset_ms;
+            let totals = backfill::scan_today(&home, day_start_ms, app_start_ms);
+            eprintln!(
+                "[backfill] today so far: {} tokens, ${:.2}, {} tool calls",
+                totals.tokens, totals.cost_usd, totals.tool_calls
+            );
+            shared_aggregator
+                .lock()
+                .expect("aggregator mutex poisoned")
+                .add_backfill(&totals);
+        });
+    }
 
     tauri::Builder::default()
         // window-state persists size/position to disk on close and restores it

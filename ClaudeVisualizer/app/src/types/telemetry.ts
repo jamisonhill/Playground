@@ -34,6 +34,11 @@ export interface SessionSnapshot {
   currentTool: ToolActivity | null;
   /** Registry `startedAt` (epoch ms) — session start time for uptime display. */
   startedAtMs: number;
+  /** Task-list progress from ~/.claude/tasks/<sessionId>/; 0/0 = no task list. */
+  tasksDone: number;
+  tasksTotal: number;
+  /** activeForm of the in-progress task, e.g. "Running tests". */
+  activeTaskForm: string | null;
 }
 
 /** What the Rust backend pushes over the Channel (Tier A, Phases 1–2). */
@@ -45,8 +50,20 @@ export interface TelemetrySnapshot {
   throughput: TraceSample;
   /** Aggregate cache-read ratio 0–100; 0 when there is no traffic. */
   cacheHitPercent: number;
+  /** Estimated burn rate in USD/hour (price-table estimate, Tier A). */
+  costPerHour: number;
+  /** Aggregate context fuel 0–100 (fullest session's tank). */
+  contextPercent: number;
   /** Ring of the last ~40 feed events, oldest→newest (dedupe by id). */
   recentEvents: FeedEvent[];
+  /** Daily odometer totals (backfilled to local midnight + live). */
+  odometers: {
+    tokensToday: number;
+    costTodayUsd: number;
+    toolCalls: number;
+    linesEdited: number;
+    commits: number;
+  };
 }
 
 /** One row in the Diagnostic Feed (claude_code.tool_result). */

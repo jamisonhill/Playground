@@ -24,5 +24,6 @@ serde_json = "1"
 notify = "8"
 # For kill(pid, 0) liveness probes and gethostname.
 libc = "0.2"
-# Parses the ISO 8601 timestamps on transcript lines (rate windows need them).
-time = { version = "0.3", features = ["parsing"] }
+# Parses the ISO 8601 timestamps on transcript lines (rate windows need them);
+# local-offset gives us the machine's timezone for the odometers' midnight reset.
+time = { version = "0.3", features = ["parsing", "local-offset"] }

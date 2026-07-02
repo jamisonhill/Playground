@@ -21,6 +21,8 @@ function Lane({ session }: { session: SessionSnapshot }) {
         <div className="name">{session.name}</div>
         <div className="model">{session.model} · {session.cwd}</div>
       </div>
+      {/* Priority: running tool > in-progress task > generic busy > idle.
+          The task count tags on whenever the session has a task list. */}
       <div className="doing">
         {isBusy ? (
           <>
@@ -31,13 +33,20 @@ function Lane({ session }: { session: SessionSnapshot }) {
                   <span className="tool">{session.currentTool.toolName}</span> · {session.currentTool.argSummary}
                 </>
               ) : (
-                // Busy but no tool info yet (current-tool tracking lands in Phase 2).
-                "working…"
+                session.activeTaskForm ?? "working…"
+              )}
+              {session.tasksTotal > 0 && (
+                <span className="taskcount"> · {session.tasksDone}/{session.tasksTotal}</span>
               )}
             </span>
           </>
         ) : (
-          <span className="txt">idle — awaiting prompt</span>
+          <span className="txt">
+            idle — awaiting prompt
+            {session.tasksTotal > 0 && (
+              <span className="taskcount"> · {session.tasksDone}/{session.tasksTotal}</span>
+            )}
+          </span>
         )}
       </div>
       {/* A 0 means "not measured yet" (context arrives in Phase 3, activity in

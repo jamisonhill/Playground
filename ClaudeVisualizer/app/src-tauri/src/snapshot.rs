@@ -30,6 +30,11 @@ pub struct SessionSnapshot {
     pub current_tool: Option<ToolActivity>,
     /// Registry `startedAt` (epoch ms) — lets the frontend show per-session uptime.
     pub started_at_ms: i64,
+    /// Task-list progress from ~/.claude/tasks/<sessionId>/ (SPEC A3); 0/0 = no list.
+    pub tasks_done: u32,
+    pub tasks_total: u32,
+    /// activeForm of the in-progress task, e.g. "Running tests".
+    pub active_task_form: Option<String>,
 }
 
 /// One row for the Diagnostic Feed: a completed tool call (tool_use matched
@@ -57,7 +62,18 @@ pub struct Throughput {
     pub cache_read_tokens_per_sec: f64,
 }
 
-/// Everything the backend knows, pushed ~10×/second (Tier A, Phases 1–2).
+/// Daily running totals for the odometer strip.
+#[derive(Clone, Copy, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OdometerTotals {
+    pub tokens_today: u64,
+    pub cost_today_usd: f64,
+    pub tool_calls: u64,
+    pub lines_edited: u64,
+    pub commits: u64,
+}
+
+/// Everything the backend knows, pushed ~10×/second (Tier A, Phases 1–3).
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TelemetrySnapshot {
@@ -67,6 +83,11 @@ pub struct TelemetrySnapshot {
     pub throughput: Throughput,
     /// Aggregate cache-read ratio 0–100 over the window; 0 when no traffic.
     pub cache_hit_percent: f64,
+    /// Estimated burn rate in USD/hour over the last minute (price table).
+    pub cost_per_hour: f64,
+    /// Aggregate context fuel 0–100: the fullest session's tank (SPEC: max).
+    pub context_percent: f64,
     /// Ring of the last ~40 feed events, oldest→newest (frontend dedupes by id).
     pub recent_events: Vec<FeedEvent>,
+    pub odometers: OdometerTotals,
 }

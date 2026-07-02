@@ -155,6 +155,9 @@ export function takeSnapshot(now: number): ClusterSnapshot {
     currentTool: s.busy ? s.tool : null,
     // Pretend each session started progressively earlier (30 min apart).
     startedAtMs: sim.appStartMs - (index + 1) * 30 * 60_000,
+    tasksDone: 0,
+    tasksTotal: 0,
+    activeTaskForm: null,
   }));
 
   // Per-snapshot jitter makes the trace look like live telemetry rather than

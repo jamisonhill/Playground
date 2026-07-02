@@ -24,6 +24,9 @@ use crate::snapshot::SessionSnapshot;
 pub struct SessionRecord {
     pub snapshot: SessionSnapshot,
     pub transcript_path: PathBuf,
+    /// Context size found by the startup transcript peek — seeds the fuel
+    /// gauge until the live tailer sees the session's next turn.
+    pub initial_context_tokens: u64,
 }
 
 /// Verified shape of ~/.claude/sessions/<pid>.json (SPEC §2 A1). Fields we
@@ -132,10 +135,11 @@ pub fn transcript_path(home: &Path, cwd: &str, session_id: &str) -> PathBuf {
 }
 
 /// Read the last `assistant` line of the session's transcript to learn which
-/// model it is running (the registry file itself has no model field). Returns
-/// None if the transcript doesn't exist yet (fresh session) or has no
-/// assistant turns — the caller falls back to the CLI version string.
-fn peek_model(path: &Path) -> Option<String> {
+/// model it is running (the registry file has no model field) and how large
+/// its context currently is (input + cache read + cache creation of the latest
+/// request). Returns None if the transcript doesn't exist yet (fresh session)
+/// or has no assistant turns — the caller falls back to the CLI version string.
+fn peek_last_assistant(path: &Path) -> Option<(String, u64)> {
     let mut file = fs::File::open(path).ok()?;
     let length = file.metadata().ok()?.len();
     // Only read the tail — transcripts grow to many MB and the newest
@@ -158,10 +162,63 @@ fn peek_model(path: &Path) -> Option<String> {
             continue;
         };
         if let Some(model) = value.pointer("/message/model").and_then(|m| m.as_str()) {
-            return Some(model.to_string());
+            let count = |key: &str| -> u64 {
+                value
+                    .pointer(&format!("/message/usage/{key}"))
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0)
+            };
+            let context_tokens = count("input_tokens")
+                + count("cache_read_input_tokens")
+                + count("cache_creation_input_tokens");
+            return Some((model.to_string(), context_tokens));
         }
     }
     None
+}
+
+/// One task file under ~/.claude/tasks/<sessionId>/ (verified shape, SPEC A3).
+#[derive(Deserialize)]
+struct TaskFile {
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    active_form: Option<String>,
+    #[serde(rename = "activeForm", default)]
+    active_form_camel: Option<String>,
+}
+
+/// Task progress for a session: (completed, total, in-progress activeForm).
+/// The tasks directory is keyed by session id (verified on this machine).
+fn task_progress(home: &Path, session_id: &str) -> (u32, u32, Option<String>) {
+    let dir = home.join(".claude/tasks").join(session_id);
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return (0, 0, None); // no task list for this session — common
+    };
+    let (mut done, mut total) = (0u32, 0u32);
+    let mut active_form: Option<String> = None;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue; // .lock / .highwatermark bookkeeping files
+        }
+        // Mid-write or malformed task files are skipped; next scan retries.
+        let Ok(text) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(task) = serde_json::from_str::<TaskFile>(&text) else {
+            continue;
+        };
+        total += 1;
+        match task.status.as_str() {
+            "completed" => done += 1,
+            "in_progress" => {
+                active_form = task.active_form_camel.or(task.active_form);
+            }
+            _ => {}
+        }
+    }
+    (done, total, active_form)
 }
 
 /// One full scan of the registry directory → the current session roster.
@@ -195,15 +252,21 @@ pub fn scan_sessions(home: &Path) -> Vec<SessionRecord> {
         }
 
         let transcript = transcript_path(home, &registry.cwd, &registry.session_id);
-        let model = peek_model(&transcript)
-            .map(|id| model_display_name(&id))
+        let peeked = peek_last_assistant(&transcript);
+        let model = peeked
+            .as_ref()
+            .map(|(id, _)| model_display_name(id))
             // No transcript yet — show the CLI version so the line isn't blank.
             .unwrap_or_else(|| format!("v{}", registry.version.as_deref().unwrap_or("?")));
+        let initial_context_tokens = peeked.map(|(_, tokens)| tokens).unwrap_or(0);
 
         let status = match registry.status.as_deref() {
             Some("busy") => "busy",
             _ => "idle",
         };
+
+        let (tasks_done, tasks_total, active_task_form) =
+            task_progress(home, &registry.session_id);
 
         sessions.push(SessionRecord {
             snapshot: SessionSnapshot {
@@ -214,12 +277,16 @@ pub fn scan_sessions(home: &Path) -> Vec<SessionRecord> {
                 model,
                 cwd: shorten_cwd(&registry.cwd, home),
                 status: status.to_string(),
-                context_percent: 0.0,  // Phase 3
+                context_percent: 0.0,  // filled by the aggregator at push time
                 activity_percent: 0.0, // filled by the aggregator at push time
                 current_tool: None,    // filled by the aggregator at push time
                 started_at_ms: registry.started_at,
+                tasks_done,
+                tasks_total,
+                active_task_form,
             },
             transcript_path: transcript,
+            initial_context_tokens,
         });
     }
 

@@ -92,9 +92,23 @@ function composeSnapshot(): ClusterSnapshot {
     feedRows,
     trace: liveTelemetry.throughput,
     gauges: {
-      ...simulated.gauges, // costPerHour + contextPercent stay simulated (Phase 3)
       outputTokensPerSec: liveTelemetry.throughput.outputTokensPerSec,
+      costPerHour: liveTelemetry.costPerHour,
+      contextPercent: liveTelemetry.contextPercent,
       cacheHitPercent: liveTelemetry.cacheHitPercent,
+    },
+    odometers: {
+      ...liveTelemetry.odometers,
+      // Uptime is the visualizer's own runtime — a frontend concern.
+      appStartMs: simulated.odometers.appStartMs,
+    },
+    // No fake warning lamps once real data flows: permission/API-error/rate
+    // telltales stay dark until Tier B/C (Phase 4) provides real signals.
+    telltales: {
+      telemetryConnected: true,
+      permissionWaiting: false,
+      apiError: false,
+      rateLimited: false,
     },
   };
 }

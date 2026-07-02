@@ -30,6 +30,11 @@ pub struct ToolUseBlock {
     pub tool_use_id: String,
     pub tool_name: String,
     pub arg_summary: String,
+    /// Lines written by Edit/Write inputs — feeds the "Lines Edited" odometer.
+    /// A rough proxy for `claude_code.lines_of_code.count` until Tier B exists.
+    pub lines_changed: u64,
+    /// True for Bash commands that run `git commit` — feeds the Commits odometer.
+    pub is_git_commit: bool,
 }
 
 /// The subset of a transcript line the aggregator cares about.
@@ -80,6 +85,31 @@ fn summarize_tool_input(input: &serde_json::Value) -> String {
     truncate_chars(text, 46)
 }
 
+/// How many lines an Edit/Write tool call writes (its replacement/content text).
+/// Other tools change no lines. This intentionally counts written lines, not a
+/// diff — good enough for an odometer, cheap to compute.
+fn count_lines_changed(tool_name: &str, input: &serde_json::Value) -> u64 {
+    let text = match tool_name {
+        "Edit" => input.get("new_string").and_then(|v| v.as_str()),
+        "Write" => input.get("content").and_then(|v| v.as_str()),
+        _ => None,
+    };
+    match text {
+        Some(t) if !t.is_empty() => t.lines().count() as u64,
+        _ => 0,
+    }
+}
+
+/// Does this Bash call run `git commit`? (Feeds the Commits odometer — the
+/// transcript fallback for `claude_code.commit.count` until Tier B exists.)
+fn is_git_commit(tool_name: &str, input: &serde_json::Value) -> bool {
+    tool_name == "Bash"
+        && input
+            .get("command")
+            .and_then(|v| v.as_str())
+            .is_some_and(|c| c.contains("git commit"))
+}
+
 /// Cut at a char boundary (byte slicing would panic mid-UTF-8) and add an ellipsis.
 fn truncate_chars(text: &str, max_chars: usize) -> String {
     if text.chars().count() <= max_chars {
@@ -124,10 +154,14 @@ pub fn parse_line(line: &str, arrival_ms: i64) -> Option<TranscriptLine> {
                         .iter()
                         .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("tool_use"))
                         .filter_map(|b| {
+                            let tool_name = b.get("name")?.as_str()?.to_string();
+                            let input = b.get("input").unwrap_or(&serde_json::Value::Null);
                             Some(ToolUseBlock {
                                 tool_use_id: b.get("id")?.as_str()?.to_string(),
-                                tool_name: b.get("name")?.as_str()?.to_string(),
-                                arg_summary: summarize_tool_input(b.get("input").unwrap_or(&serde_json::Value::Null)),
+                                arg_summary: summarize_tool_input(input),
+                                lines_changed: count_lines_changed(&tool_name, input),
+                                is_git_commit: is_git_commit(&tool_name, input),
+                                tool_name,
                             })
                         })
                         .collect()
