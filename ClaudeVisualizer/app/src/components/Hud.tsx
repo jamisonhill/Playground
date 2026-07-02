@@ -56,7 +56,7 @@ export function Hud({ host, busySessionCount, totalSessionCount, telltales, rost
         <div className={`lamp${telltales.rateLimited ? " on-amber" : ""}`} title="Rate limit">↯</div>
       </div>
       <span className="badge">
-        {rosterLive ? "Live Roster · Sim Metrics" : "Simulated Data"}
+        {rosterLive ? "Live Telemetry · Sim Cost/Fuel" : "Simulated Data"}
       </span>
     </header>
   );

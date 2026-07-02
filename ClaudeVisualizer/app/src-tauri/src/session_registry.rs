@@ -17,6 +17,15 @@ use serde::Deserialize;
 
 use crate::snapshot::SessionSnapshot;
 
+/// A live session as the registry watcher sees it: the display snapshot plus
+/// the transcript path the tailer needs (built from the *original* cwd — the
+/// snapshot's cwd is shortened for display and useless for path building).
+#[derive(Clone)]
+pub struct SessionRecord {
+    pub snapshot: SessionSnapshot,
+    pub transcript_path: PathBuf,
+}
+
 /// Verified shape of ~/.claude/sessions/<pid>.json (SPEC §2 A1). Fields we
 /// don't use are simply not declared — serde ignores unknown fields.
 #[derive(Deserialize)]
@@ -86,7 +95,7 @@ fn shorten_cwd(cwd: &str, home: &Path) -> String {
 
 /// "claude-opus-4-8" → "Opus 4.8", "claude-fable-5" → "Fable 5",
 /// "claude-haiku-4-5-20251001" → "Haiku 4.5" (date suffixes dropped).
-fn model_display_name(model_id: &str) -> String {
+pub fn model_display_name(model_id: &str) -> String {
     let Some(rest) = model_id.strip_prefix("claude-") else {
         return model_id.to_string(); // unrecognized scheme — show the raw id
     };
@@ -114,17 +123,20 @@ fn model_display_name(model_id: &str) -> String {
 /// How many bytes of transcript tail to search for the latest model id.
 const MODEL_PEEK_BYTES: u64 = 262_144;
 
+/// The transcript for a session lives at
+/// ~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl (SPEC §2 A2).
+pub fn transcript_path(home: &Path, cwd: &str, session_id: &str) -> PathBuf {
+    home.join(".claude/projects")
+        .join(encode_cwd(cwd))
+        .join(format!("{session_id}.jsonl"))
+}
+
 /// Read the last `assistant` line of the session's transcript to learn which
 /// model it is running (the registry file itself has no model field). Returns
 /// None if the transcript doesn't exist yet (fresh session) or has no
 /// assistant turns — the caller falls back to the CLI version string.
-fn peek_model(home: &Path, cwd: &str, session_id: &str) -> Option<String> {
-    let path = home
-        .join(".claude/projects")
-        .join(encode_cwd(cwd))
-        .join(format!("{session_id}.jsonl"));
-
-    let mut file = fs::File::open(&path).ok()?;
+fn peek_model(path: &Path) -> Option<String> {
+    let mut file = fs::File::open(path).ok()?;
     let length = file.metadata().ok()?.len();
     // Only read the tail — transcripts grow to many MB and the newest
     // assistant line is what we want anyway.
@@ -153,7 +165,7 @@ fn peek_model(home: &Path, cwd: &str, session_id: &str) -> Option<String> {
 }
 
 /// One full scan of the registry directory → the current session roster.
-pub fn scan_sessions(home: &Path) -> Vec<SessionSnapshot> {
+pub fn scan_sessions(home: &Path) -> Vec<SessionRecord> {
     let dir = home.join(".claude/sessions");
     let mut sessions = Vec::new();
 
@@ -182,7 +194,8 @@ pub fn scan_sessions(home: &Path) -> Vec<SessionSnapshot> {
             continue;
         }
 
-        let model = peek_model(home, &registry.cwd, &registry.session_id)
+        let transcript = transcript_path(home, &registry.cwd, &registry.session_id);
+        let model = peek_model(&transcript)
             .map(|id| model_display_name(&id))
             // No transcript yet — show the CLI version so the line isn't blank.
             .unwrap_or_else(|| format!("v{}", registry.version.as_deref().unwrap_or("?")));
@@ -192,26 +205,30 @@ pub fn scan_sessions(home: &Path) -> Vec<SessionSnapshot> {
             _ => "idle",
         };
 
-        sessions.push(SessionSnapshot {
-            session_id: registry.session_id,
-            name: registry
-                .name
-                .unwrap_or_else(|| format!("pid-{}", registry.pid)),
-            model,
-            cwd: shorten_cwd(&registry.cwd, home),
-            status: status.to_string(),
-            context_percent: 0.0,  // Phase 3
-            activity_percent: 0.0, // Phase 2
-            current_tool: None,    // Phase 2
-            started_at_ms: registry.started_at,
+        sessions.push(SessionRecord {
+            snapshot: SessionSnapshot {
+                session_id: registry.session_id,
+                name: registry
+                    .name
+                    .unwrap_or_else(|| format!("pid-{}", registry.pid)),
+                model,
+                cwd: shorten_cwd(&registry.cwd, home),
+                status: status.to_string(),
+                context_percent: 0.0,  // Phase 3
+                activity_percent: 0.0, // filled by the aggregator at push time
+                current_tool: None,    // filled by the aggregator at push time
+                started_at_ms: registry.started_at,
+            },
+            transcript_path: transcript,
         });
     }
 
     // Stable lane order: oldest session first, session id as tiebreaker.
     sessions.sort_by(|a, b| {
-        a.started_at_ms
-            .cmp(&b.started_at_ms)
-            .then_with(|| a.session_id.cmp(&b.session_id))
+        a.snapshot
+            .started_at_ms
+            .cmp(&b.snapshot.started_at_ms)
+            .then_with(|| a.snapshot.session_id.cmp(&b.snapshot.session_id))
     });
     sessions
 }
@@ -220,7 +237,7 @@ pub fn scan_sessions(home: &Path) -> Vec<SessionSnapshot> {
 /// changes (create/modify/delete via `notify`) and at least every 2 seconds
 /// regardless — a process can die without any file event, and only a rescan
 /// notices the dead PID.
-pub fn spawn_watcher(shared_sessions: Arc<Mutex<Vec<SessionSnapshot>>>) {
+pub fn spawn_watcher(shared_sessions: Arc<Mutex<Vec<SessionRecord>>>) {
     std::thread::spawn(move || {
         let home = home_dir();
         let sessions_dir = home.join(".claude/sessions");
@@ -254,7 +271,7 @@ pub fn spawn_watcher(shared_sessions: Arc<Mutex<Vec<SessionSnapshot>>>) {
             let scanned = scan_sessions(&home);
             let fingerprint = scanned
                 .iter()
-                .map(|s| format!("{}:{}", s.name, s.status))
+                .map(|s| format!("{}:{}", s.snapshot.name, s.snapshot.status))
                 .collect::<Vec<_>>()
                 .join(",");
             if fingerprint != last_roster_fingerprint {

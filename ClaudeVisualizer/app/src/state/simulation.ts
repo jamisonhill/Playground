@@ -166,9 +166,6 @@ export function takeSnapshot(now: number): ClusterSnapshot {
     cacheReadTokensPerSec: clamp(sim.tachTarget * 0.9 + jitter() * 260, 0, 2600),
   };
 
-  const recentEvents = sim.pendingEvents;
-  sim.pendingEvents = [];
-
   return {
     generatedAtMs: now,
     host: "jamison-mbp",
@@ -181,7 +178,7 @@ export function takeSnapshot(now: number): ClusterSnapshot {
       cacheHitPercent: sim.cacheTarget,
     },
     trace,
-    recentEvents,
+    feedRows: [], // the store accumulates feed rows (see drainSimFeedEvents)
     odometers: {
       tokensToday: sim.tokensToday,
       costTodayUsd: sim.costTodayUsd,
@@ -197,6 +194,13 @@ export function takeSnapshot(now: number): ClusterSnapshot {
       rateLimited: sim.rateLimited,
     },
   };
+}
+
+/** Simulated feed events created since the last drain (the store accumulates). */
+export function drainSimFeedEvents(): FeedEvent[] {
+  const events = sim.pendingEvents;
+  sim.pendingEvents = [];
+  return events;
 }
 
 /** Backfill so the feed isn't empty on first paint (mockup seeds 12 rows). */

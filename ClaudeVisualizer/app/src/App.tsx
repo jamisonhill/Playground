@@ -25,7 +25,7 @@ function App() {
       <GaugeCluster gauges={snapshot.gauges} />
       <SessionLanes sessions={snapshot.sessions} />
       <Trace trace={snapshot.trace} />
-      <Feed recentEvents={snapshot.recentEvents} />
+      <Feed rows={snapshot.feedRows} />
       <Odometers odometers={snapshot.odometers} />
     </div>
   );

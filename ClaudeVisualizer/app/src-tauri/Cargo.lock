@@ -332,6 +332,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-window-state",
+ "time",
 ]
 
 [[package]]

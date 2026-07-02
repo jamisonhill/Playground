@@ -1,28 +1,22 @@
 // Feed — the diagnostic ticker of tool_result events, newest first.
 //
-// Snapshots deliver only the events created since the previous snapshot; this
-// component accumulates them, deduplicates by id (so React StrictMode's
-// double-run of effects can't insert a row twice), and trims the list to what
-// fits the panel height so the window never scrolls.
+// The store hands us already-accumulated, already-deduplicated rows; this
+// component only measures how many fit the panel height so the window never
+// scrolls, and renders that many.
 
 import { useEffect, useRef, useState } from "react";
 import type { FeedEvent } from "../types/telemetry";
 
 // Approximate row height in px, used to compute how many rows fit (mockup value).
 const ROW_HEIGHT_PX = 27;
-// Keep a bit more history than the tallest realistic panel can show, so
-// enlarging the window immediately reveals older rows instead of blanks.
-const MAX_RETAINED_ROWS = 80;
 
 function formatTime(timeMs: number): string {
   return new Date(timeMs).toTimeString().slice(0, 8);
 }
 
-export function Feed({ recentEvents }: { recentEvents: FeedEvent[] }) {
+export function Feed({ rows }: { rows: FeedEvent[] }) {
   const bodyRef = useRef<HTMLDivElement>(null);
-  const [rows, setRows] = useState<FeedEvent[]>([]); // newest first
   const [capacity, setCapacity] = useState(12);
-  const lastSeenIdRef = useRef(0);
 
   // Recompute how many rows fit whenever the panel is resized.
   useEffect(() => {
@@ -35,16 +29,6 @@ export function Feed({ recentEvents }: { recentEvents: FeedEvent[] }) {
     resizeObserver.observe(body);
     return () => resizeObserver.disconnect();
   }, []);
-
-  // Fold newly-arrived events into the accumulated list.
-  useEffect(() => {
-    const fresh = recentEvents.filter((event) => event.id > lastSeenIdRef.current);
-    if (fresh.length === 0) return;
-    lastSeenIdRef.current = fresh[fresh.length - 1].id;
-    setRows((previous) =>
-      [...fresh].reverse().concat(previous).slice(0, MAX_RETAINED_ROWS),
-    );
-  }, [recentEvents]);
 
   return (
     <section className="panel a-feed">

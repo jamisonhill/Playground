@@ -36,11 +36,17 @@ export interface SessionSnapshot {
   startedAtMs: number;
 }
 
-/** What the Rust registry watcher pushes over the Channel (Tier A1, Phase 1). */
-export interface RegistrySnapshot {
+/** What the Rust backend pushes over the Channel (Tier A, Phases 1–2). */
+export interface TelemetrySnapshot {
   generatedAtMs: number;
   host: string;
   sessions: SessionSnapshot[];
+  /** Machine-wide token rates over the sliding window (tach + trace). */
+  throughput: TraceSample;
+  /** Aggregate cache-read ratio 0–100; 0 when there is no traffic. */
+  cacheHitPercent: number;
+  /** Ring of the last ~40 feed events, oldest→newest (dedupe by id). */
+  recentEvents: FeedEvent[];
 }
 
 /** One row in the Diagnostic Feed (claude_code.tool_result). */
@@ -104,8 +110,8 @@ export interface ClusterSnapshot {
   sessions: SessionSnapshot[];
   gauges: AggregateGauges;
   trace: TraceSample;
-  /** Only events created since the previous snapshot (the feed accumulates them). */
-  recentEvents: FeedEvent[];
+  /** Accumulated feed rows, newest first, already capped — render directly. */
+  feedRows: FeedEvent[];
   odometers: OdometerTotals;
   telltales: Telltales;
 }
