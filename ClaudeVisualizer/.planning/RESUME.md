@@ -1,41 +1,46 @@
 # Resume: ClaudeVisualizer
 
-**Paused:** 2026-07-02 ~5:45pm
-**Reason:** Project complete — pausing to finalize documentation.
-**Phase:** 6/6 done (Phases 0–5, commits `28bab22` → `210f73d` + this pause commit)
+**Paused:** 2026-07-03 ~9:50am
+**Reason:** Native arm64 .dmg rebuilt on the home machine — good stopping point.
+**Phase:** 6/6 done. Project still COMPLETE; this session added the native
+Apple Silicon build (was a deferred item).
 
-**What's working (all verified on this machine):**
-- Release app runs from `app/src-tauri/target/release/bundle/macos/ClaudeVisualizer.app`
-- Live Tier A data: roster (3 sessions seen), transcript telemetry, odometers
-  (backfill found 75.5M tokens / ~$114 / 601 tool calls that day), task progress
-- Tier B (:4317) and Tier C (:4319) servers verified listening; hook installer
-  unit-tested (never live-tested against a real permission prompt — see below)
-- 26 Rust tests green; frontend tsc/vite clean
+**What this session did (home Mac, Apple M3 Max):**
+- Discovered a fresh checkout: no `target/`, no `node_modules`, no Rust toolchain
+  (this is a DIFFERENT machine than the M1 that built the original x64 dmg).
+- Reinstalled: `brew install rustup` → `rustup default stable` (installed
+  x86_64 toolchain because brew is Intel-prefix / Rosetta) →
+  `rustup target add aarch64-apple-darwin`. Ran `npm install` in `app/`.
+- Built native arm64: `npm run tauri build -- --target aarch64-apple-darwin`
+  (4m31s cold). Verified `lipo -archs` = arm64. Opened the dmg.
 
-**Not yet verified end-to-end (first user to try it confirms):**
-1. Tier B with a real exporter — launch Claude Code with the env vars from the
-   ⚙ popover and watch the green ◉ lamp + burn-rate takeover.
-2. Tier C permission lamp — install hooks via ⚙, start a NEW Claude Code
-   session, trigger a permission prompt, watch the amber "!".
-3. The .dmg on the other Mac (unsigned → right-click Open; Intel build → Rosetta
-   on Apple Silicon).
+**Artifacts (NOT in git — rebuild if gone):**
+- `app/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/ClaudeVisualizer_0.1.0_aarch64.dmg` (4.3M)
+- `.../bundle/macos/ClaudeVisualizer.app`
 
-**Key decisions on record:**
-- Cost is a price-table ESTIMATE (list API prices) unless Tier B is live;
-  table lives in `app/src-tauri/src/model_config.rs`.
-- Usage lines repeating per requestId are DELTA'd, never summed (regression-tested).
-- Hooks installer is the app's only write to ~/.claude: backup created at
-  `settings.json.claudevisualizer-backup`, entries tagged with our URL, refuses
-  malformed JSON.
-- Tailer starts at EOF; backfill covers pre-launch lines (cutoff = app start).
+**Key facts to remember next time:**
+- Both of Jamison's Macs are Apple Silicon (work=M1, home=M3 Max) but run an
+  Intel-prefix Homebrew (`/usr/local`), so rustup runs under Rosetta and the
+  DEFAULT build is x86_64. For a native arm build you MUST pass
+  `--target aarch64-apple-darwin`. (Memory `rust-toolchain-path` updated to match.)
+- Still unsigned/ad-hoc → on any other Mac, right-click → Open the first time.
+- Build outputs (`target/`, `.app`, `.dmg`) are never committed; a fresh checkout
+  needs toolchain reinstall + `npm install` before building.
 
 **To restart dev:**
 ```sh
 cd ~/Ai/Playground/ClaudeVisualizer/app
-export PATH="/usr/local/opt/rustup/bin:$PATH"   # brew rustup is keg-only
+export PATH="/usr/local/opt/rustup/bin:$PATH"   # keg-only brew rustup
 npm run tauri dev
 ```
-Tests: `cd app/src-tauri && cargo test`. Release: `npm run tauri build`.
+Native release build:
+```sh
+npm run tauri build -- --target aarch64-apple-darwin
+```
+Tests: `cd app/src-tauri && cargo test`.
 
-**Next action if resuming:** pick from the Deferred list in PROGRESS.md —
-most likely Developer ID signing, or a native arm64 build on the other Mac.
+**Next action if resuming — pick from PROGRESS.md Deferred list:**
+- Developer ID signing + notarization (needs Apple Developer cert), OR
+- Universal (Intel+ARM) build via `--target universal-apple-darwin`, OR
+- Menu-bar companion + launch-at-login (SPEC §8), OR
+- Price-table refresh in `src-tauri/src/model_config.rs`.

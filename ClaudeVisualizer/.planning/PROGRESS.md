@@ -36,6 +36,9 @@
 
 ## Deferred / user-action items
 - [ ] Developer ID signing + notarization (needs Apple Developer cert)
-- [ ] Apple Silicon / universal build (this machine is Intel; build on the M-series Mac)
+- [x] Native Apple Silicon build — arm64 .dmg built 2026-07-03 on home M3 Max
+      (`ClaudeVisualizer_0.1.0_aarch64.dmg`, verified `lipo -archs` = arm64).
+      Note: brew is Intel-prefix so rustup runs under Rosetta; must build with
+      `--target aarch64-apple-darwin` for native. Universal build still open if wanted.
 - [ ] Menu-bar companion + launch-at-login (SPEC §8: deferred from v1)
 - [ ] Price-table upkeep in src-tauri/src/model_config.rs when Anthropic pricing changes
