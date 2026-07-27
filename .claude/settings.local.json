@@ -21,7 +21,11 @@
       "Bash(pkill -f Ollama)",
       "Read(//Applications/Ollama.app/Contents/Resources/**)",
       "Read(//Users/jamisonhill/.claude/skills/**)",
-      "Bash(ls -d research-orchestrator planning-orchestrator pause-work resume-work)"
+      "Bash(ls -d research-orchestrator planning-orchestrator pause-work resume-work)",
+      "Read(//private/tmp/**)",
+      "Bash(touch ~/Ai/Playground/.__scantest ~/Ai/Playground/.DS_Store)",
+      "Bash(~/.claude/bin/scan-repos.sh)",
+      "Read(//Users/jamisonhill/.claude/image-cache/**)"
     ]
   }
 }
