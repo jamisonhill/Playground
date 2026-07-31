@@ -25,7 +25,8 @@
       "Read(//private/tmp/**)",
       "Bash(touch ~/Ai/Playground/.__scantest ~/Ai/Playground/.DS_Store)",
       "Bash(~/.claude/bin/scan-repos.sh)",
-      "Read(//Users/jamisonhill/.claude/image-cache/**)"
+      "Read(//Users/jamisonhill/.claude/image-cache/**)",
+      "Bash(sed -i '' 's|\"build\": \"tsc -p tsconfig.json\"|\"build\": \"tsc -p tsconfig.build.json\"|' package.json)"
     ]
   }
 }
