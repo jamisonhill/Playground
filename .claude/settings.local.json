@@ -26,7 +26,9 @@
       "Bash(touch ~/Ai/Playground/.__scantest ~/Ai/Playground/.DS_Store)",
       "Bash(~/.claude/bin/scan-repos.sh)",
       "Read(//Users/jamisonhill/.claude/image-cache/**)",
-      "Bash(sed -i '' 's|\"build\": \"tsc -p tsconfig.json\"|\"build\": \"tsc -p tsconfig.build.json\"|' package.json)"
+      "Bash(sed -i '' 's|\"build\": \"tsc -p tsconfig.json\"|\"build\": \"tsc -p tsconfig.build.json\"|' package.json)",
+      "Bash(pkill -f \"cloudflared access\")",
+      "Bash(ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new nas-home 'echo SSH OK; hostname; whoami; uname -m')"
     ]
   }
 }
