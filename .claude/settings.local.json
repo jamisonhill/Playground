@@ -28,7 +28,15 @@
       "Read(//Users/jamisonhill/.claude/image-cache/**)",
       "Bash(sed -i '' 's|\"build\": \"tsc -p tsconfig.json\"|\"build\": \"tsc -p tsconfig.build.json\"|' package.json)",
       "Bash(pkill -f \"cloudflared access\")",
-      "Bash(ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new nas-home 'echo SSH OK; hostname; whoami; uname -m')"
+      "Bash(ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new nas-home 'echo SSH OK; hostname; whoami; uname -m')",
+      "Bash(ditto /Users/jamisonhill/Ai/Personal/apps/audioRouting/build/Build/Products/Debug/OWL.app \"/Applications/OWL — Audio Routing.app\")",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :CFBundleName\" \"/Applications/OWL — Audio Routing.app/Contents/Info.plist\")",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :CFBundleDisplayName\" \"/Applications/OWL — Audio Routing.app/Contents/Info.plist\")",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :CFBundleIdentifier\" \"/Applications/OWL — Audio Routing.app/Contents/Info.plist\")",
+      "Bash(codesign --verify --deep --strict \"/Applications/OWL — Audio Routing.app\")",
+      "Bash(open \"/Applications/OWL — Audio Routing.app\")",
+      "Bash(osascript -e 'tell application id \"com.jamisonhill.owl\" to quit')",
+      "Bash(break)"
     ]
   }
 }
