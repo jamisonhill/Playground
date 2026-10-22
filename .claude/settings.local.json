@@ -38,5 +38,8 @@
       "Bash(osascript -e 'tell application id \"com.jamisonhill.owl\" to quit')",
       "Bash(break)"
     ]
-  }
+  },
+  "disabledMcpjsonServers": [
+    "ollama-local"
+  ]
 }
