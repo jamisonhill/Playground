@@ -13,8 +13,12 @@
 
 ## Next action
 1. If rsync died but BB-NAS is up with ECC=0: `sudo bash -c "setsid nohup /root/creatives-move.sh run >> /root/creatives-rsync.log 2>&1 < /dev/null &"` (resumes).
-2. After the copy: `creatives-move.sh verify` (no output lines = clean); check Creatives permissions
-   (rsync ran as root without perms — files may need File Station "apply to sub-folders"/synoacltool inherit).
+2. After the copy: `creatives-move.sh verify` (no output lines = clean). THEN the user wants every item in
+   /volume1/Creatives checked: all must inherit the share ACL (Creatives, hlewis, hunter, administrators: full, fd).
+   The user applied File Station "apply to sub-folders" on 11-03 mid-copy, so later items are still Linux mode 000.
+   Find them: `find /volume1/Creatives ! -path '*/#recycle*' | while read f; do /usr/syno/bin/synoacltool -get "$f" | grep -q 'Linux mode' && echo "$f"; done`
+   Fix: `/usr/syno/bin/synoacltool -enforce-inherit` on each (or the user re-applies in File Station); re-check = 0 left.
+   Then test that the Creatives account can read (e.g. `sudo -u Creatives ls`). Delete the QNAP junk dirs .streams and .@upload_cache under each Archive.
 3. Cleanup: remove /root/.ssh/id_qnap*, QNAP authorized_keys entries (/etc/config/ssh + ~/.ssh), /etc/sudoers.d/claude-deploy;
    ask whether to keep the 10G static IPs. Nothing on the QNAP gets deleted.
 4. Still open: data scrub, UPS + safe shutdown, close Synology ticket #4057706.
