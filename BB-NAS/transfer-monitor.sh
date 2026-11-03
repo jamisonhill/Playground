@@ -1,22 +1,28 @@
 #!/bin/bash
-# Monitors the BB-NAS -> MH-Production Hunter rsync every 15 minutes.
+# Monitors an rsync running ON BB-NAS every 15 minutes (template; first used for Hunter, now Creatives).
 # - Kills rsync immediately if any NEW ECC / machine-check event appears.
 # - Exits (which notifies Claude) when rsync stops, ECC trips, or SSH keeps failing.
 
-LOG="$(dirname "$0")/hunter-monitor.log"
+# Per-transfer settings: monitor log (Mac), rsync process pattern + log and job script (BB-NAS)
+LOG="$(dirname "$0")/creatives-monitor.log"
+RSYNC_PAT="[r]sync -rlts"
+REMOTE_LOG="/root/creatives-rsync.log"
+JOB_PAT="[c]reatives-move.sh"
 BASELINE_MSG_ECC=128   # all 128 existing hits are from 2026-10-28 (old DIMM)
 INTERVAL=900
 ssh_failures=0
 
 while true; do
   # One SSH round-trip gathers everything; fields separated by "|"
-  status=$(ssh -o ConnectTimeout=15 -o BatchMode=yes bb-nas '
+  status=$(ssh -o ConnectTimeout=15 -o BatchMode=yes bb-nas "RSYNC_PAT='$RSYNC_PAT' REMOTE_LOG='$REMOTE_LOG' bash -s" <<'REMOTE'
     dm=$(sudo dmesg | grep -ciE "ECC notification|Hardware Error")
     msg=$(sudo grep -ciE "ECC notification|Machine Check" /var/log/messages)
-    pids=$(ps aux | grep "[r]sync -rlt" | awk "{print \$2}" | tr "\n" " ")
+    pids=$(ps aux | grep "$RSYNC_PAT" | awk "{print \$2}" | tr "\n" " ")
     up=$(cut -d. -f1 /proc/uptime)
-    prog=$(sudo tail -c 300 /root/hunter-rsync.log | tr "\r" "\n" | grep -E "[0-9]" | tail -1 | xargs)
-    echo "$dm|$msg|$pids|$up|$prog"' 2>&1)
+    prog=$(sudo tail -c 300 "$REMOTE_LOG" | tr "\r" "\n" | grep -E "[0-9]" | tail -1 | xargs)
+    echo "$dm|$msg|$pids|$up|$prog"
+REMOTE
+  )
 
   # SSH failure: NAS may be rebooting or the network dropped
   if [[ "$status" != *"|"* ]]; then
@@ -35,7 +41,7 @@ while true; do
 
   # Any new ECC event -> stop the copy right away
   if (( dmesg_ecc > 0 || msg_ecc > BASELINE_MSG_ECC )); then
-    ssh bb-nas 'sudo kill $(ps aux | grep -E "[r]sync -rlt|[h]unter-move.sh" | awk "{print \$2}") 2>/dev/null'
+    ssh bb-nas "sudo kill \$(ps aux | grep -E '$RSYNC_PAT|$JOB_PAT' | awk '{print \$2}') 2>/dev/null"
     echo "$(date '+%F %T') EXIT: ECC EVENT DETECTED — rsync killed (dmesg=$dmesg_ecc msgs=$msg_ecc)" | tee -a "$LOG"
     exit 3
   fi
@@ -43,7 +49,7 @@ while true; do
   # rsync gone -> finished, crashed, or NAS rebooted; show the log tail so we can tell which
   if [[ -z "${rsync_pids// }" ]]; then
     echo "$(date '+%F %T') EXIT: rsync no longer running (uptime=${uptime_s}s)" | tee -a "$LOG"
-    ssh bb-nas 'sudo tail -c 1500 /root/hunter-rsync.log | tr "\r" "\n" | tail -25' | tee -a "$LOG"
+    ssh bb-nas "sudo tail -c 1500 $REMOTE_LOG | tr '\r' '\n' | tail -25" | tee -a "$LOG"
     exit 0
   fi
 

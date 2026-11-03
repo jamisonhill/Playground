@@ -1,27 +1,25 @@
 # Resume — BB-NAS (Breaking Barriers DS1522+, 10.20.70.42)
 
-**Paused:** 2026-11-02 · **Reason:** Hunter migration finished; waiting on next transfer tasks
-**Phase/Task:** Hunter migration COMPLETE · awaiting the user's next automated transfer request
-**Tree:** clean · **Last commit:** see `git log -1`
+**Updated:** 2026-11-03 12:15 · **Phase 5:** QNAP -> BB-NAS Creatives copy RUNNING
+**Tree:** see `git log -1`
 
 ## State
-- Hunter + BRoll From Hunter + HUNTER RECORDED Backups are on MH-Production at
-  /volume2/Production/z_MigratedFromBB-NAS/: 60,892 files, 20.62T, size+mtime verified, permissions fixed.
-- The sources were deleted from BB-NAS. Volume 1 is now 5.78 TiB used / 29.13 TiB free.
-- The checksum verify was canceled (too long, about 2 days). The quick verify plus matching counts and bytes was accepted.
-- The replacement 16 GB ECC DIMM has had 0 ECC errors since 10-29 (the 128 entries in /var/log/messages are all from 10-28).
-- Claude access is intentionally kept: /etc/sudoers.d/claude-deploy and /root/.rsync66 on BB-NAS.
+- QNAP TS-X82 "Production-NAS" is direct-cabled 10G to BB-NAS: QNAP Ethernet 6 (eth5) 192.168.200.2 <->
+  BB-NAS LAN 5 (eth4) 192.168.200.1, no gateway. Link 10000 Mb/s. QNAP also on Mac Thunderbolt 169.254.6.249 (unplugged now).
+- /root/creatives-move.sh (dry|run|verify) on BB-NAS pulls QNAP "/share/Archive 2" then "/share/Archive 1"
+  into /volume1/Creatives/<share>/ over ssh (root key /root/.ssh/id_qnap -> QNAP admin). Log /root/creatives-rsync.log.
+- Started 2026-11-03 12:08: 161,648 files / 23.7 TB (A2 11.85T, A1 11.84T), ~305 MB/s, ETA ~Wed 11-04 10:00.
+- Mac-side BB-NAS/transfer-monitor.sh runs every 15 min (kills rsync on any new ECC; baseline msgs=128).
 
 ## Next action
-1. Ask the user what to transfer next. Reuse BB-NAS/hunter-move.sh as a template (dry → run →
-   quick verify) and BB-NAS/transfer-monitor.sh for the 15-min ECC watch (kills rsync on ECC).
-2. When the user says the transfers are done, remove /root/.rsync66 and /etc/sudoers.d/claude-deploy.
-3. Still open: the data scrub, a UPS (then set the safe shutdown), and closing Synology ticket #4057706.
+1. If rsync died but BB-NAS is up with ECC=0: `sudo bash -c "setsid nohup /root/creatives-move.sh run >> /root/creatives-rsync.log 2>&1 < /dev/null &"` (resumes).
+2. After the copy: `creatives-move.sh verify` (no output lines = clean); check Creatives permissions
+   (rsync ran as root without perms — files may need File Station "apply to sub-folders"/synoacltool inherit).
+3. Cleanup: remove /root/.ssh/id_qnap*, QNAP authorized_keys entries (/etc/config/ssh + ~/.ssh), /etc/sudoers.d/claude-deploy;
+   ask whether to keep the 10G static IPs. Nothing on the QNAP gets deleted.
+4. Still open: data scrub, UPS + safe shutdown, close Synology ticket #4057706.
 
 ## Gotchas
-- Transfers saturate both NASes, and the videographer edits on MH-Production. Pause with
-  `sudo kill -STOP <pid>` / `-CONT`, or use --bwlimit during work hours.
-- Never run the `-c` checksum verify without saying it takes about 2 days for 20T.
-- `df -h` rounds up. Quote `df -B1` values to match DSM.
-- DSM has no pgrep, so use `ps aux | grep "[r]sync -rlt"`. Folder names may end in U+F028, so match them with globs.
-- More detail is in the bb-nas-recovery auto-memory.
+- QNAP busybox: no `find -size +NM`, no bc. DSM: no pgrep, no scp/sftp (pipe via `ssh ... sudo tee`).
+- QNAP share names differ from folder names (/share/Archive 2 -> CACHEDEV4 "Archive 01"); always use /share/<share>.
+- `df -h` rounds up; quote `df -B1` values.
