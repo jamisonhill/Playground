@@ -5,8 +5,10 @@
 ## Phase 3 — Hunter migration to MH-Production [COMPLETE]
 
 ## Phase 4 — Follow-up transfers + hardening
-- [ ] Next automated transfer tasks (user to specify) ← PAUSED HERE
-- [ ] Remove /root/.rsync66 and /etc/sudoers.d/claude-deploy once transfers are done
+- [x] BB-NAS -> MH-Production transfers done (user, 2026-11-03)
+- [x] Removed /root/.rsync66 + hunter-move.sh/logs from BB-NAS (2026-11-03)
+- [ ] Phase 5: QNAP (Thunderbolt 169.254.6.249) -> BB-NAS /volume1/Creatives ← strategy proposed
+- [ ] Remove /etc/sudoers.d/claude-deploy after the Creatives transfer
 - [ ] Data scrub (Storage Manager > Storage Pool 1)
 - [ ] Install UPS, then set Control Panel > Hardware & Power > UPS to a safe shutdown
 - [ ] Close Synology ticket #4057706
