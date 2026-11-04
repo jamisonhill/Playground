@@ -13,5 +13,5 @@
 - Volume 1: about 30.0 TB used / 8.3 TB free.
 
 ## Next action
-1. Ask: keep or remove the claude-deploy DSM user on BB-NAS; keep or revert the 10G static IPs.
+1. claude-deploy DSM user: KEEP (user, 11-04). 10G static IPs: left as is.
 2. Still open: data scrub, UPS + safe shutdown, close Synology ticket #4057706.
