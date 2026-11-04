@@ -3,14 +3,12 @@
 ## Phase 1 — Recovery from full volume + RW cache hang [COMPLETE]
 ## Phase 2 — RAM root cause (ECC) + DIMM swap [COMPLETE]
 ## Phase 3 — Hunter migration to MH-Production [COMPLETE]
+## Phase 4 — QNAP Archive 1 + 2 -> /volume1/Creatives over direct 10G [COMPLETE]
 
-## Phase 4 — Follow-up transfers + hardening
-- [x] BB-NAS -> MH-Production transfers done (user, 2026-11-03)
-- [x] Removed /root/.rsync66 + hunter-move.sh/logs from BB-NAS (2026-11-03)
-- [x] Phase 5 setup: 10G direct link (192.168.200.1/.2), keys, creatives-move.sh, dry run clean
-- [x] Phase 5 copy: 161,648 files / 23.7 TB -> /volume1/Creatives (11-03 12:08 -> 11-04 13:01), verified, ACLs fixed
-- [x] Removed QNAP keys, BB-NAS /root/.ssh + scripts, /etc/sudoers.d/claude-deploy (2026-11-04)
-- [x] Keep claude-deploy user (non-admin) on BB-NAS (user, 11-04)
-- [ ] Data scrub (Storage Manager > Storage Pool 1)
+## Phase 5 — Hardening + QNAP repurpose
+- [ ] Data scrub (Storage Manager > Storage Pool 1) — do before the QNAP is wiped ← PAUSED HERE
 - [ ] Install UPS, then set Control Panel > Hardware & Power > UPS to a safe shutdown
+- [ ] User checks QNAP Public/Multimedia/Web/apps + the ~17 GB volume before wiping
+- [ ] Decide a second copy of Creatives (Hyper Backup / reuse QNAP drives) — BB-NAS is now the only copy
+- [ ] Optional: add drives to BB-NAS (2 free bays, hot-swap OK; UPS first; >=18 TB for full SHR gain)
 - [ ] Close Synology ticket #4057706
